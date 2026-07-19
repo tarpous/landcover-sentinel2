@@ -13,7 +13,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - name: Install dependencies
+      - name: Install dependencies (CPU, default groups only)
         run: uv sync --frozen
       - name: Lint
         run: |
@@ -23,3 +23,15 @@ jobs:
         run: uv run mypy
       - name: Test
         run: uv run pytest
+
+  train-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install training group (CPU torch)
+        run: uv sync --frozen --group train
+      - name: Smoke-test training scripts
+        run: uv run pytest -m smoke --no-cov

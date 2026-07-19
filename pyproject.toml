@@ -9,6 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.1",
     "scikit-learn>=1.5",
+    "rasterio>=1.4",
 ]
 
 [dependency-groups]
@@ -17,6 +18,18 @@ dev = [
     "mypy>=1.16",
     "pytest>=8.3",
     "pytest-cov>=6.1",
+    "typer>=0.15",
+]
+# Non-default GPU training group — NOT in the default `uv sync` (keeps CI CPU-only
+# and lean). Install locally with `uv sync --group train`; torch resolves to the
+# CPU wheel in the lock so the CI smoke job works, then on the 4080S swap in CUDA:
+#   uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# (The TerraTorch foundation-model track runs in the Docker CUDA container, not here.)
+train = [
+    "torch>=2.6",
+    "torchvision>=0.21",
+    "timm>=1.0",
+    "segmentation-models-pytorch>=0.4",
 ]
 
 [project.scripts]
@@ -39,6 +52,10 @@ select = [
     "E", "W", "F", "I", "UP", "B", "SIM", "C4", "PT", "RET", "RUF",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Training scripts set cache env vars before importing the heavy libraries.
+"scripts/*" = ["E402"]
+
 [tool.mypy]
 strict = true
 files = ["src"]
@@ -50,6 +67,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=landcover --cov-report=term-missing"
+markers = [
+    "smoke: training-wiring tests that need the `train` group (uv sync --group train)",
+]
 
 [tool.coverage.run]
 source = ["src/landcover"]

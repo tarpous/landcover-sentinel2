@@ -20,6 +20,16 @@ htmlcov/
 # Data: raw downloads are fetched by scripts, only data/sample/ is committed
 data/raw/
 
+# Model artifacts stay local; commit only results/*.json + a few figures
+runs/
+weights/
+*.pt
+*.ckpt
+*.onnx
+
 # OS
 Thumbs.db
 .DS_Store
+
+# Repo-local model/weights caches (HF_HOME, TORCH_HOME, YOLO_CONFIG_DIR)
+.cache/
