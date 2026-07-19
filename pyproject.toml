@@ -1,0 +1,55 @@
+[project]
+name = "landcover-sentinel2"
+version = "0.1.0"
+description = "Sentinel-2 land cover as a study: Random Forest vs U-Net vs a LoRA-fine-tuned geospatial foundation model, with spatially blocked splits and label-efficiency curves"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.1",
+    "scikit-learn>=1.5",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12",
+    "mypy>=1.16",
+    "pytest>=8.3",
+    "pytest-cov>=6.1",
+]
+
+[project.scripts]
+landcover = "landcover.cli:app"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/landcover"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "UP", "B", "SIM", "C4", "PT", "RET", "RUF",
+]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "rasterio.*", "geopandas.*", "shapely.*", "stackstac.*", "pystac_client.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=landcover --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/landcover"]
