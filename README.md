@@ -27,7 +27,14 @@ Train the deep models on a local GPU (or any CUDA machine):
 uv sync --group train        # CPU torch + timm + segmentation-models-pytorch
 # then swap in the CUDA build for your card, e.g. Ada / RTX 40-series:
 uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+# Track 1 — real EuroSAT MS (2 GB, md5-verified):
+uv run python scripts/fetch_data.py --eurosat
 uv run python scripts/train_eurosat.py --root data/raw/eurosat --epochs 20
+
+# Track 2 — Sentinel-2 composite + WorldCover chips over an AOI (needs pystac-client + stackstac):
+uv pip install pystac-client stackstac
+uv run python scripts/fetch_data.py --aoi 22.7 40.5 23.2 40.8 --chip 256   # wider Thessaloniki
 uv run python scripts/train_segmentation.py --root data/raw/chips --epochs 40
 ```
 
@@ -61,7 +68,7 @@ The classical, CPU-only foundation is complete and CI-tested. The STAC/WorldCove
 ```
 src/landcover/    classes (5-class + WorldCover/EuroSAT remaps) · indices · datasets ·
                   rf (patch + pixel Random Forests) · metrics · splits · cli
-scripts/          make_sample_data.py · train_eurosat.py · train_segmentation.py
+scripts/          fetch_data.py · make_sample_data.py · train_eurosat.py · train_segmentation.py
 notebooks/        Colab/Kaggle copies of the training scripts
 data/sample/      small synthetic fixtures — everything runs offline from these
 results/          generated metrics (the only source of README numbers)
