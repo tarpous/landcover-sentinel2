@@ -11,6 +11,26 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 - **Track 1 — EuroSAT patch classification:** Random Forest on spectral indices vs a fine-tuned ResNet-18 vs a DINOv3 satellite linear probe, reported against published EuroSAT numbers.
 - **Track 2 — Sentinel-2 segmentation:** per-pixel Random Forest vs a U-Net vs a LoRA-fine-tuned geospatial foundation model (TerraMind via TerraTorch), on ESA-WorldCover-supervised chips over a Thessaloniki AOI, with per-class F1/IoU and a **label-efficiency curve** (performance at 10 / 25 / 100 % of training labels — the argument foundation-model papers make).
 
+## Results
+
+<!-- results:begin -->
+### Track 1 — EuroSAT patch classification
+
+**Dataset:** EuroSAT (MSI) · five target classes
+
+| Model | Overall accuracy | Macro-F1 | Test patches |
+|---|---:|---:|---:|
+| Random Forest (spectral indices) | 0.885 | 0.860 | 5400 |
+| ResNet-18 (RGB fine-tune) | 0.972 | 0.968 | 5400 |
+
+### Track 2 — Sentinel-2 segmentation
+
+_No run recorded yet — see `scripts/train_segmentation.py`._
+
+<!-- results:end -->
+
+Every number is generated from the committed metrics JSONs by `scripts/make_results_table.py`; the deep-model rows are real local GPU runs on an RTX 4080 SUPER, scored through the same `landcover.metrics` as the classical baselines. On EuroSAT the fine-tuned ResNet-18 clears the Random Forest by a wide margin (OA 0.97 vs 0.89) — the expected result on a clean patch benchmark — while the Random Forest stays a respectable, ~100× cheaper baseline whose per-class errors concentrate in the spectrally mixed "barren" class.
+
 ## Quickstart
 
 Offline, from committed sample fixtures (< 5 min):
@@ -61,7 +81,7 @@ Three choices carry the study:
 
 ## Status
 
-The classical, CPU-only foundation is complete and CI-tested. The STAC/WorldCover data fetch, the deep-model runs that fill the result tables, and the analysis section are the remaining milestones; this README fills in with generated result tables as those land. `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool.
+Track 1 (EuroSAT) is measured end-to-end on real data. Track 2's Sentinel-2/WorldCover fetch and the U-Net / TerraMind-LoRA runs are scripted and wiring-tested; run them with the commands above to fill that table. `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool. (A DINOv3 satellite linear probe is a drop-in third Track-1 model; it needs Meta's gated weights, so it is left as an optional extension.)
 
 ## Repository layout
 

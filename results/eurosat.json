@@ -1,0 +1,120 @@
+{
+  "dataset": "EuroSAT (MSI)",
+  "track": "eurosat-patch-classification",
+  "models": {
+    "Random Forest (spectral indices)": {
+      "overall_accuracy": 0.8854,
+      "macro_f1": 0.86,
+      "mean_iou": 0.7761,
+      "per_class_f1": {
+        "urban": 0.8508,
+        "water": 0.9577,
+        "forest": 0.9729,
+        "agriculture": 0.9125,
+        "barren": 0.6062
+      },
+      "per_class_iou": {
+        "urban": 0.7404,
+        "water": 0.9189,
+        "forest": 0.9473,
+        "agriculture": 0.8391,
+        "barren": 0.435
+      },
+      "confusion": [
+        [
+          964,
+          4,
+          0,
+          59,
+          73
+        ],
+        [
+          23,
+          1031,
+          0,
+          3,
+          43
+        ],
+        [
+          0,
+          0,
+          593,
+          7,
+          0
+        ],
+        [
+          77,
+          5,
+          24,
+          1872,
+          122
+        ],
+        [
+          102,
+          13,
+          2,
+          62,
+          321
+        ]
+      ],
+      "n_samples": 5400
+    },
+    "ResNet-18 (RGB fine-tune)": {
+      "overall_accuracy": 0.972,
+      "macro_f1": 0.9675,
+      "mean_iou": 0.9376,
+      "per_class_f1": {
+        "urban": 0.9905,
+        "water": 0.9682,
+        "forest": 0.9379,
+        "agriculture": 0.9766,
+        "barren": 0.9644
+      },
+      "per_class_iou": {
+        "urban": 0.9811,
+        "water": 0.9383,
+        "forest": 0.8831,
+        "agriculture": 0.9543,
+        "barren": 0.9312
+      },
+      "confusion": [
+        [
+          1091,
+          0,
+          0,
+          4,
+          5
+        ],
+        [
+          3,
+          1050,
+          30,
+          9,
+          8
+        ],
+        [
+          0,
+          1,
+          597,
+          2,
+          0
+        ],
+        [
+          4,
+          16,
+          46,
+          2024,
+          10
+        ],
+        [
+          5,
+          2,
+          0,
+          6,
+          487
+        ]
+      ],
+      "n_samples": 5400
+    }
+  }
+}

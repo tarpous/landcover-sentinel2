@@ -51,40 +51,64 @@ def rf_metrics(train: list[PatchSample], test: list[PatchSample]) -> Metrics:
     return compute_metrics(truth, predictions)
 
 
+# ImageNet normalization for the pretrained ResNet-18 stem.
+_IMAGENET_MEAN = (0.485, 0.456, 0.406)
+_IMAGENET_STD = (0.229, 0.224, 0.225)
+# Sentinel-2 L2A surface reflectance is scaled by 10000; divide to reach [0, 1].
+_S2_SCALE = 10000.0
+_N_CLASSES = 5
+
+
+def _rgb_batch(samples: list[PatchSample]) -> tuple[object, object]:
+    """(N, 3, H, W) reflectance→[0,1] RGB tensor + label tensor, ImageNet-normed."""
+    import torch
+
+    from landcover.indices import B_BLUE, B_GREEN, B_RED
+
+    images = np.stack([s.bands[[B_RED, B_GREEN, B_BLUE]] for s in samples]).astype(np.float32)
+    images = np.clip(images / _S2_SCALE, 0.0, 1.0)
+    tensor = torch.from_numpy(images)
+    mean = torch.tensor(_IMAGENET_MEAN).view(1, 3, 1, 1)
+    std = torch.tensor(_IMAGENET_STD).view(1, 3, 1, 1)
+    tensor = (tensor - mean) / std
+    labels = torch.from_numpy(np.array([s.label for s in samples], dtype=np.int64))
+    return tensor, labels
+
+
 def cnn_metrics(
-    train: list[PatchSample], test: list[PatchSample], *, epochs: int, device: str
+    train: list[PatchSample], test: list[PatchSample], *, epochs: int, device: str, batch: int = 128
 ) -> Metrics:
-    """Fine-tune a small CNN (ResNet-18) on the RGB bands of the patches."""
+    """Fine-tune an ImageNet-pretrained ResNet-18 on the RGB bands, mini-batched."""
     import torch
     from torch import nn
-    from torchvision.models import resnet18
+    from torch.utils.data import DataLoader, TensorDataset
+    from torchvision.models import ResNet18_Weights, resnet18
 
-    def to_rgb_tensor(samples: list[PatchSample]) -> tuple[torch.Tensor, torch.Tensor]:
-        from landcover.indices import B_BLUE, B_GREEN, B_RED
-
-        images = np.stack([s.bands[[B_RED, B_GREEN, B_BLUE]] for s in samples]).astype(np.float32)
-        labels = np.array([s.label for s in samples], dtype=np.int64)
-        return torch.from_numpy(images), torch.from_numpy(labels)
-
-    x_train, y_train = to_rgb_tensor(train)
-    x_test, y_test = to_rgb_tensor(test)
-
-    model = resnet18(weights=None, num_classes=len({s.label for s in train + test}) or 5)
+    weights = None if len(train) < 50 else ResNet18_Weights.IMAGENET1K_V1  # smoke: from scratch
+    model = resnet18(weights=weights)
+    model.fc = nn.Linear(model.fc.in_features, _N_CLASSES)
     model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+
+    x_train, y_train = _rgb_batch(train)
+    loader = DataLoader(TensorDataset(x_train, y_train), batch_size=batch, shuffle=True)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
     loss_fn = nn.CrossEntropyLoss()
     model.train()
     for _ in range(epochs):
-        optimizer.zero_grad()
-        logits = model(x_train.to(device))
-        loss = loss_fn(logits, y_train.to(device))
-        loss.backward()
-        optimizer.step()
+        for xb, yb in loader:
+            optimizer.zero_grad()
+            loss = loss_fn(model(xb.to(device)), yb.to(device))
+            loss.backward()
+            optimizer.step()
 
     model.eval()
+    x_test, y_test = _rgb_batch(test)
+    predictions = []
     with torch.no_grad():
-        predictions = model(x_test.to(device)).argmax(1).cpu().numpy().astype(np.int64)
-    return compute_metrics(y_test.numpy(), predictions)
+        for start in range(0, len(x_test), batch):
+            logits = model(x_test[start : start + batch].to(device))
+            predictions.append(logits.argmax(1).cpu().numpy())
+    return compute_metrics(y_test.numpy(), np.concatenate(predictions).astype(np.int64))
 
 
 def write_results(rows: dict[str, Metrics], *, dataset: str) -> None:
