@@ -122,8 +122,20 @@ def fetch_aoi(bbox: tuple[float, float, float, float], date_range: str, chip: in
     # Earth Search S2 L2A has 12 bands (no B10 cirrus — that is L1C only). Order
     # them to the EuroSAT/indices.py 13-band convention and splice a zero B10 at
     # index 10 so B11(SWIR1)=11 and B12(SWIR2)=12 line up with the feature code.
-    bands = ["coastal", "blue", "green", "red", "rededge1", "rededge2", "rededge3",
-             "nir", "nir08", "nir09", "swir16", "swir22"]
+    bands = [
+        "coastal",
+        "blue",
+        "green",
+        "red",
+        "rededge1",
+        "rededge2",
+        "rededge3",
+        "nir",
+        "nir08",
+        "nir09",
+        "swir16",
+        "swir22",
+    ]
     items = list(s2.items())
     if not items:
         raise SystemExit("no Sentinel-2 items for that bbox/date range")
