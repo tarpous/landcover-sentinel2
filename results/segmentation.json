@@ -1,0 +1,235 @@
+{
+  "track": "segmentation",
+  "models": {
+    "random_forest": {
+      "overall_accuracy": 0.9045,
+      "macro_f1": 0.6355,
+      "mean_iou": 0.5507,
+      "per_class_f1": {
+        "urban": 0.9053,
+        "water": 0.9977,
+        "forest": 0.5698,
+        "agriculture": 0.688,
+        "barren": 0.0168
+      },
+      "per_class_iou": {
+        "urban": 0.827,
+        "water": 0.9954,
+        "forest": 0.3984,
+        "agriculture": 0.5243,
+        "barren": 0.0085
+      },
+      "confusion": [
+        [
+          177478,
+          198,
+          7992,
+          11175,
+          113
+        ],
+        [
+          731,
+          242150,
+          93,
+          4,
+          22
+        ],
+        [
+          8039,
+          8,
+          19069,
+          5943,
+          1
+        ],
+        [
+          8312,
+          42,
+          6696,
+          35532,
+          30
+        ],
+        [
+          569,
+          27,
+          25,
+          32,
+          7
+        ]
+      ],
+      "n_samples": 524288
+    },
+    "unet_label_efficiency": {
+      "10pct": {
+        "overall_accuracy": 0.8243,
+        "macro_f1": 0.3635,
+        "mean_iou": 0.3354,
+        "per_class_f1": {
+          "urban": 0.822,
+          "water": 0.9875,
+          "forest": 0.0,
+          "agriculture": 0.0022,
+          "barren": 0.0059
+        },
+        "per_class_iou": {
+          "urban": 0.6978,
+          "water": 0.9753,
+          "forest": 0.0,
+          "agriculture": 0.0011,
+          "barren": 0.003
+        },
+        "confusion": [
+          [
+            189936,
+            3131,
+            2,
+            98,
+            3789
+          ],
+          [
+            818,
+            242156,
+            0,
+            1,
+            25
+          ],
+          [
+            28164,
+            830,
+            0,
+            31,
+            4035
+          ],
+          [
+            45653,
+            1294,
+            0,
+            57,
+            3608
+          ],
+          [
+            586,
+            38,
+            0,
+            0,
+            36
+          ]
+        ],
+        "n_samples": 524288
+      },
+      "25pct": {
+        "overall_accuracy": 0.8121,
+        "macro_f1": 0.3581,
+        "mean_iou": 0.3273,
+        "per_class_f1": {
+          "urban": 0.8178,
+          "water": 0.971,
+          "forest": 0.0007,
+          "agriculture": 0.0006,
+          "barren": 0.0003
+        },
+        "per_class_iou": {
+          "urban": 0.6918,
+          "water": 0.9437,
+          "forest": 0.0003,
+          "agriculture": 0.0003,
+          "barren": 0.0002
+        },
+        "confusion": [
+          [
+            183479,
+            3883,
+            0,
+            8,
+            9586
+          ],
+          [
+            734,
+            242263,
+            0,
+            0,
+            3
+          ],
+          [
+            25371,
+            5609,
+            11,
+            9,
+            2060
+          ],
+          [
+            41546,
+            4181,
+            2,
+            15,
+            4868
+          ],
+          [
+            620,
+            37,
+            0,
+            0,
+            3
+          ]
+        ],
+        "n_samples": 524288
+      },
+      "100pct": {
+        "overall_accuracy": 0.8732,
+        "macro_f1": 0.5134,
+        "mean_iou": 0.4463,
+        "per_class_f1": {
+          "urban": 0.8823,
+          "water": 0.9979,
+          "forest": 0.5322,
+          "agriculture": 0.1544,
+          "barren": 0.0
+        },
+        "per_class_iou": {
+          "urban": 0.7895,
+          "water": 0.9957,
+          "forest": 0.3626,
+          "agriculture": 0.0837,
+          "barren": 0.0
+        },
+        "confusion": [
+          [
+            192345,
+            425,
+            3812,
+            373,
+            1
+          ],
+          [
+            344,
+            242539,
+            113,
+            0,
+            4
+          ],
+          [
+            13890,
+            21,
+            18623,
+            526,
+            0
+          ],
+          [
+            31844,
+            90,
+            14366,
+            4310,
+            2
+          ],
+          [
+            606,
+            43,
+            11,
+            0,
+            0
+          ]
+        ],
+        "n_samples": 524288
+      }
+    }
+  }
+}
