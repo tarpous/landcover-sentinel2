@@ -111,6 +111,55 @@ def cnn_metrics(
     return compute_metrics(y_test.numpy(), np.concatenate(predictions).astype(np.int64))
 
 
+DINOV3_SAT = "facebook/dinov3-vitl16-pretrain-sat493m"
+
+
+def dinov3_probe_metrics(
+    train: list[PatchSample], test: list[PatchSample], *, device: str, batch: int = 64
+) -> Metrics:
+    """Linear probe on frozen DINOv3 satellite ViT features (RGB, 224 px).
+
+    The backbone is never updated — only a logistic-regression head is fit on
+    the pooled embeddings, which is the standard cheap way to read out a
+    self-supervised representation. DINOv3-sat is EO-pretrained, so it should be
+    a strong, near-training-free classifier.
+    """
+    import torch
+    from sklearn.linear_model import LogisticRegression
+    from transformers import AutoModel
+
+    backbone = AutoModel.from_pretrained(DINOV3_SAT).to(device).eval()
+
+    def embed(samples: list[PatchSample]) -> np.ndarray:
+        from landcover.indices import B_BLUE, B_GREEN, B_RED
+
+        mean = torch.tensor(_IMAGENET_MEAN, device=device).view(1, 3, 1, 1)
+        std = torch.tensor(_IMAGENET_STD, device=device).view(1, 3, 1, 1)
+        features = []
+        with torch.no_grad():
+            for start in range(0, len(samples), batch):
+                chunk = samples[start : start + batch]
+                rgb = np.stack([s.bands[[B_RED, B_GREEN, B_BLUE]] for s in chunk]).astype(
+                    np.float32
+                )
+                x = torch.from_numpy(np.clip(rgb / _S2_SCALE, 0.0, 1.0)).to(device)
+                x = torch.nn.functional.interpolate(
+                    x, size=224, mode="bilinear", align_corners=False
+                )
+                x = (x - mean) / std
+                out = backbone(pixel_values=x)
+                pooled = getattr(out, "pooler_output", None)
+                emb = pooled if pooled is not None else out.last_hidden_state[:, 0]
+                features.append(emb.cpu().numpy())
+        return np.concatenate(features)
+
+    x_train, x_test = embed(train), embed(test)
+    y_train = np.array([s.label for s in train], dtype=np.int64)
+    y_test = np.array([s.label for s in test], dtype=np.int64)
+    clf = LogisticRegression(max_iter=2000, C=1.0).fit(x_train, y_train)
+    return compute_metrics(y_test, clf.predict(x_test).astype(np.int64))
+
+
 def write_results(rows: dict[str, Metrics], *, dataset: str) -> None:
     RESULTS.mkdir(exist_ok=True)
     payload = {
@@ -128,6 +177,11 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--dinov3",
+        action="store_true",
+        help="Add a DINOv3-sat linear probe (needs `pip install transformers` + gated HF access).",
+    )
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
 
@@ -142,6 +196,8 @@ def main() -> None:
 
     rows = {"Random Forest (spectral indices)": rf_metrics(train, test)}
     rows["ResNet-18 (RGB fine-tune)"] = cnn_metrics(train, test, epochs=epochs, device=device)
+    if args.dinov3:
+        rows["DINOv3-sat linear probe"] = dinov3_probe_metrics(train, test, device=device)
     for name, metrics in rows.items():
         print(f"{name}: OA={metrics.overall_accuracy:.3f} macroF1={metrics.macro_f1:.3f}")
 

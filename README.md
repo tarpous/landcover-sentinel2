@@ -23,7 +23,8 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 | Model | Overall accuracy | Macro-F1 | Test patches |
 |---|---:|---:|---:|
 | Random Forest (spectral indices) | 0.885 | 0.860 | 5400 |
-| ResNet-18 (RGB fine-tune) | 0.972 | 0.968 | 5400 |
+| ResNet-18 (RGB fine-tune) | 0.974 | 0.971 | 5400 |
+| DINOv3-sat linear probe | 0.987 | 0.985 | 5400 |
 
 ### Track 2 — Sentinel-2 segmentation
 
@@ -42,7 +43,7 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 
 Every number is generated from the committed metrics JSONs by `scripts/make_results_table.py`; the deep-model rows are real local GPU runs on an RTX 4080 SUPER, scored through the same `landcover.metrics` as the classical baselines.
 
-**When does the classical method win?** The two tracks answer it in opposite directions, which is the point. On **EuroSAT** — 27 000 clean labelled patches — the fine-tuned ResNet-18 clears the Random Forest by a wide margin (OA 0.97 vs 0.89): abundant labels reward model capacity. On the **Sentinel-2 segmentation** track — one small Thessaloniki AOI, only a handful of WorldCover-supervised chips — the per-pixel **Random Forest beats the U-Net** (mean IoU 0.55 vs 0.45), because a data-hungry segmentation network cannot out-learn the RF's spectral separability from so few labels. That is the honest, reproducible thesis of the whole repo: deep models win when labels are plentiful; the ~100× cheaper classical baseline wins in the low-label regime, exactly where a foundation model's label efficiency is supposed to help (the next model to add). The label-efficiency curve is noisy at this dataset size — read the 10%→100% endpoints, not the wiggle — and a larger AOI would lift the U-Net; both caveats are stated rather than hidden.
+**When does the classical method win?** The two tracks answer it in opposite directions, which is the point. On **EuroSAT** — 27 000 clean labelled patches — model capacity is rewarded and the ordering is Random Forest 0.885 < fine-tuned ResNet-18 0.974 < **DINOv3-sat linear probe 0.987**. The last result is the striking one: a *frozen* satellite-pretrained self-supervised ViT with nothing but a logistic-regression head on top beats a fully fine-tuned CNN — a clean demonstration of why EO foundation-model representations are worth their size. On the **Sentinel-2 segmentation** track — one small Thessaloniki AOI, only a handful of WorldCover-supervised chips — the direction flips: the per-pixel **Random Forest beats the U-Net** (mean IoU 0.55 vs 0.45), because a data-hungry segmentation network cannot out-learn the RF's spectral separability from so few labels. That contrast is the honest, reproducible thesis of the whole repo: capacity (and pretrained representations) win when labels are plentiful; the ~100× cheaper classical baseline wins in the low-label regime. The label-efficiency curve is noisy at this dataset size — read the 10%→100% endpoints, not the wiggle — and a larger AOI would lift the U-Net; both caveats are stated rather than hidden.
 
 ## Quickstart
 
@@ -61,9 +62,10 @@ uv sync --group train        # CPU torch + timm + segmentation-models-pytorch
 # then swap in the CUDA build for your card, e.g. Ada / RTX 40-series:
 uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# Track 1 — real EuroSAT MS (2 GB, md5-verified):
+# Track 1 — real EuroSAT MS (2 GB, md5-verified); --dinov3 adds the DINOv3-sat probe
+# (needs `uv pip install transformers` and gated HF access to the satellite model):
 uv run python scripts/fetch_data.py --eurosat
-uv run python scripts/train_eurosat.py --root data/raw/eurosat --epochs 20
+uv run python scripts/train_eurosat.py --root data/raw/eurosat --epochs 20 --dinov3
 
 # Track 2 — Sentinel-2 composite + WorldCover chips over an AOI (needs pystac-client + stackstac):
 uv pip install pystac-client stackstac
@@ -98,7 +100,7 @@ The row-normalized confusion matrix shows where the errors actually land (`scrip
 
 ## Status
 
-Both tracks are measured end-to-end on real data (EuroSAT MS for Track 1; a real Sentinel-2 median composite + ESA WorldCover over Thessaloniki for Track 2). `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool. Two drop-in extensions are left optional because they need gated/large downloads: a DINOv3 satellite linear probe (Track 1, Meta gated weights) and a LoRA-fine-tuned TerraMind via TerraTorch (Track 2, run from the Docker CUDA container) — both slot into the same scored comparison.
+Both tracks are measured end-to-end on real data (EuroSAT MS for Track 1 — RF, ResNet-18 and the DINOv3-sat probe; a real Sentinel-2 median composite + ESA WorldCover over Thessaloniki for Track 2). `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool. One further model is left as a documented extension: a LoRA-fine-tuned TerraMind (or Prithvi-EO-2.0) via TerraTorch for Track 2, run from the Docker CUDA container; it slots into the same scored comparison.
 
 ## Repository layout
 
