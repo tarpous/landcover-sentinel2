@@ -76,22 +76,41 @@ def fetch_eurosat() -> None:
     print(f"extracted {len(list(target.iterdir()))} class directories")
 
 
+WORLDCOVER_URL = (
+    "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/"
+    "ESA_WorldCover_10m_2021_v200_{tile}_Map.tif"
+)
+
+
+def worldcover_tile(west: float, south: float) -> str:
+    """The 3-degree WorldCover tile name covering a bbox's SW corner (e.g. N39E021)."""
+    lat3 = int(south // 3 * 3)
+    lon3 = int(west // 3 * 3)
+    ns = f"N{lat3:02d}" if lat3 >= 0 else f"S{abs(lat3):02d}"
+    ew = f"E{lon3:03d}" if lon3 >= 0 else f"W{abs(lon3):03d}"
+    return f"{ns}{ew}"
+
+
 def fetch_aoi(bbox: tuple[float, float, float, float], date_range: str, chip: int) -> None:
     """Fetch a Sentinel-2 L2A median composite + WorldCover labels as chips.
 
-    Requires the STAC extras (pystac-client, stackstac). Chips are written as
-    ``data/raw/chips/aoi_<c>_<r>_image.npy`` / ``_label.npy`` — the shape
-    ``landcover.datasets.load_chips`` expects.
+    Sentinel-2 comes from the Earth Search STAC (stackstac median composite);
+    ESA WorldCover 2021 is read directly from its public S3 COG (it is not on
+    Earth Search) and resampled onto the composite grid. Chips are written as
+    ``data/raw/chips/aoi_<c>_<r>_image.npy`` / ``_label.npy``.
     """
     import numpy as np
     import pystac_client
+    import rasterio
     import stackstac
     from rasterio.enums import Resampling
+    from rasterio.windows import from_bounds
 
     from landcover.classes import remap_worldcover
 
     chips_dir = RAW / "chips"
     chips_dir.mkdir(parents=True, exist_ok=True)
+    west, south, east, north = bbox
 
     catalog = pystac_client.Client.open("https://earth-search.aws.element84.com/v1")
     s2 = catalog.search(
@@ -100,39 +119,29 @@ def fetch_aoi(bbox: tuple[float, float, float, float], date_range: str, chip: in
         datetime=date_range,
         query={"eo:cloud_cover": {"lt": 20}},
     )
-    bands = [
-        "coastal",
-        "blue",
-        "green",
-        "red",
-        "rededge1",
-        "rededge2",
-        "rededge3",
-        "nir",
-        "nir08",
-        "nir09",
-        "swir16",
-        "swir22",
-    ]
-    stack = stackstac.stack(
-        list(s2.items()), assets=bands, epsg=4326, resolution=0.0001, bounds_latlon=bbox
-    )
-    composite = stack.median(dim="time").compute().to_numpy()  # (bands, H, W)
+    # Earth Search S2 L2A has 12 bands (no B10 cirrus — that is L1C only). Order
+    # them to the EuroSAT/indices.py 13-band convention and splice a zero B10 at
+    # index 10 so B11(SWIR1)=11 and B12(SWIR2)=12 line up with the feature code.
+    bands = ["coastal", "blue", "green", "red", "rededge1", "rededge2", "rededge3",
+             "nir", "nir08", "nir09", "swir16", "swir22"]
+    items = list(s2.items())
+    if not items:
+        raise SystemExit("no Sentinel-2 items for that bbox/date range")
+    print(f"compositing {len(items)} Sentinel-2 scenes ...")
+    stack = stackstac.stack(items, assets=bands, epsg=4326, resolution=0.0001, bounds_latlon=bbox)
+    twelve = stack.median(dim="time").compute().to_numpy()  # (12, H, W)
+    _, height, width = twelve.shape
+    composite = np.insert(twelve, 10, 0.0, axis=0)  # -> (13, H, W), zero B10
 
-    wc = catalog.search(collections=["esa-worldcover"], bbox=list(bbox))
-    wc_stack = stackstac.stack(
-        list(wc.items())[:1],
-        assets=["map"],
-        epsg=4326,
-        resolution=0.0001,
-        bounds_latlon=bbox,
-        resampling=Resampling.nearest,
-    )
-    labels_raw = wc_stack.isel(time=0, band=0).compute().to_numpy()
-    remap = np.vectorize(remap_worldcover)
-    labels = remap(labels_raw.astype(int))
+    tile = worldcover_tile(west, south)
+    print(f"reading WorldCover tile {tile} ...")
+    with rasterio.open(WORLDCOVER_URL.format(tile=tile)) as wc:
+        window = from_bounds(west, south, east, north, wc.transform)
+        labels_raw = wc.read(
+            1, window=window, out_shape=(height, width), resampling=Resampling.nearest
+        )
+    labels = np.vectorize(remap_worldcover)(labels_raw.astype(int))
 
-    _, height, width = composite.shape
     n_rows, n_cols = height // chip, width // chip
     count = 0
     for r in range(n_rows):
