@@ -64,6 +64,12 @@ def track2() -> list[str]:
             f"| U-Net (100% labels) | {cell(m['overall_accuracy'])} "
             f"| {cell(m['mean_iou'])} | {cell(m['macro_f1'])} |"
         )
+    gfm = models.get("prithvi_lora")
+    if gfm:
+        lines.append(
+            f"| Prithvi-EO-2.0 (LoRA) | {cell(gfm['overall_accuracy'])} "
+            f"| {cell(gfm['mean_iou'])} | {cell(gfm['macro_f1'])} |"
+        )
     if curve:
         lines.append("")
         lines.append("**Label-efficiency curve (U-Net mean IoU):**")

@@ -9,7 +9,7 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 ## Two tracks
 
 - **Track 1 — EuroSAT patch classification:** Random Forest on spectral indices vs a fine-tuned ResNet-18 vs a DINOv3 satellite linear probe, reported against published EuroSAT numbers.
-- **Track 2 — Sentinel-2 segmentation:** per-pixel Random Forest vs a U-Net vs a LoRA-fine-tuned geospatial foundation model (TerraMind via TerraTorch), on ESA-WorldCover-supervised chips over a Thessaloniki AOI, with per-class F1/IoU and a **label-efficiency curve** (performance at 10 / 25 / 100 % of training labels — the argument foundation-model papers make).
+- **Track 2 — Sentinel-2 segmentation:** per-pixel Random Forest vs a U-Net vs a LoRA-fine-tuned geospatial foundation model (Prithvi-EO-2.0 via TerraTorch), on ESA-WorldCover-supervised chips over a Thessaloniki AOI, with per-class F1/IoU and a **label-efficiency curve** (performance at 10 / 25 / 100 % of training labels — the argument foundation-model papers make).
 
 ![Sentinel-2, Random Forest prediction, and WorldCover truth over Thessaloniki](docs/img/segmentation_map.png)
 
@@ -32,6 +32,7 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 |---|---:|---:|---:|
 | Random Forest (per-pixel) | 0.904 | 0.551 | 0.635 |
 | U-Net (100% labels) | 0.873 | 0.446 | 0.513 |
+| Prithvi-EO-2.0 (LoRA) | 0.610 | 0.183 | 0.240 |
 
 **Label-efficiency curve (U-Net mean IoU):**
 
@@ -43,7 +44,7 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 
 Every number is generated from the committed metrics JSONs by `scripts/make_results_table.py`; the deep-model rows are real local GPU runs on an RTX 4080 SUPER, scored through the same `landcover.metrics` as the classical baselines.
 
-**When does the classical method win?** The two tracks answer it in opposite directions, which is the point. On **EuroSAT** — 27 000 clean labelled patches — model capacity is rewarded and the ordering is Random Forest 0.885 < fine-tuned ResNet-18 0.974 < **DINOv3-sat linear probe 0.987**. The last result is the striking one: a *frozen* satellite-pretrained self-supervised ViT with nothing but a logistic-regression head on top beats a fully fine-tuned CNN — a clean demonstration of why EO foundation-model representations are worth their size. On the **Sentinel-2 segmentation** track — one small Thessaloniki AOI, only a handful of WorldCover-supervised chips — the direction flips: the per-pixel **Random Forest beats the U-Net** (mean IoU 0.55 vs 0.45), because a data-hungry segmentation network cannot out-learn the RF's spectral separability from so few labels. That contrast is the honest, reproducible thesis of the whole repo: capacity (and pretrained representations) win when labels are plentiful; the ~100× cheaper classical baseline wins in the low-label regime. The label-efficiency curve is noisy at this dataset size — read the 10%→100% endpoints, not the wiggle — and a larger AOI would lift the U-Net; both caveats are stated rather than hidden.
+**When does the classical method win?** The two tracks answer it in opposite directions, which is the point. On **EuroSAT** — 27 000 clean labelled patches — model capacity is rewarded and the ordering is Random Forest 0.885 < fine-tuned ResNet-18 0.974 < **DINOv3-sat linear probe 0.987**. The last result is the striking one: a *frozen* satellite-pretrained self-supervised ViT with nothing but a logistic-regression head on top beats a fully fine-tuned CNN — a clean demonstration of why EO foundation-model representations are worth their size. On the **Sentinel-2 segmentation** track — one small Thessaloniki AOI, only a handful of WorldCover-supervised chips — the direction flips: the per-pixel **Random Forest beats the U-Net** (mean IoU 0.55 vs 0.45), because a data-hungry segmentation network cannot out-learn the RF's spectral separability from so few labels. The **Prithvi-EO-2.0 foundation model, LoRA-fine-tuned** (only 6.7 % of its 326 M parameters trainable), lands lowest of the three here (mean IoU 0.18) — which is honest and unsurprising: adapting a 300 M geospatial transformer on ~6 chips is exactly the regime where a big model has too little signal, and its label efficiency would only show at scale. That contrast is the reproducible thesis of the whole repo: capacity and pretrained representations win when labels are plentiful (EuroSAT); the ~100× cheaper classical baseline wins in the low-label regime (this AOI). The label-efficiency curve is noisy at this dataset size — read the 10%→100% endpoints, not the wiggle — and a larger AOI would lift both the U-Net and the foundation model; every one of these caveats is stated rather than hidden.
 
 ## Quickstart
 
@@ -69,11 +70,15 @@ uv run python scripts/train_eurosat.py --root data/raw/eurosat --epochs 20 --din
 
 # Track 2 — Sentinel-2 composite + WorldCover chips over an AOI (needs pystac-client + stackstac):
 uv pip install pystac-client stackstac
-uv run python scripts/fetch_data.py --aoi 22.7 40.5 23.2 40.8 --chip 256   # wider Thessaloniki
-uv run python scripts/train_segmentation.py --root data/raw/chips --epochs 40
+uv run python scripts/fetch_data.py --aoi 22.90 40.55 23.02 40.64 --chip 256   # Thessaloniki
+uv run python scripts/train_segmentation.py --root data/raw/chips --epochs 60 --block-size 512
+
+# Track 2 foundation model — Prithvi-EO-2.0 with LoRA (needs terratorch + peft):
+uv pip install terratorch peft
+uv run python scripts/train_gfm.py --root data/raw/chips --epochs 80
 ```
 
-The training wiring is guarded by a CPU smoke test (`pytest -m smoke`, a separate CI job) that runs each script's `--smoke` path on the sample fixtures, so the load→train→score path can't silently break. The TerraMind LoRA track runs from the Docker CUDA container to keep the Linux-first EO stack off the host.
+The training wiring is guarded by a CPU smoke test (`pytest -m smoke`, a separate CI job) that runs each script's `--smoke` path on the sample fixtures, so the load→train→score path can't silently break.
 
 ## How it works
 
@@ -83,7 +88,7 @@ flowchart LR
     WC["ESA WorldCover 2021"] -->|"5-class remap (tested)"| RAW
     RAW -->|"spatial-block split"| DS["chips / patches"]
     DS -->|"RF (CPU)"| M1["Random Forest baseline"]
-    DS -->|"train_*.py (local GPU)"| M2["ResNet-18 / DINOv3 / U-Net / TerraMind-LoRA"]
+    DS -->|"train_*.py (local GPU)"| M2["ResNet-18 / DINOv3 / U-Net / Prithvi-LoRA"]
     M1 & M2 -->|"shared metrics"| RES["results/*.json → README tables"]
     DS -->|"landcover predict"| GEO["classified GeoTIFF + area stats"]
 ```
@@ -100,14 +105,14 @@ The row-normalized confusion matrix shows where the errors actually land (`scrip
 
 ## Status
 
-Both tracks are measured end-to-end on real data (EuroSAT MS for Track 1 — RF, ResNet-18 and the DINOv3-sat probe; a real Sentinel-2 median composite + ESA WorldCover over Thessaloniki for Track 2). `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool. One further model is left as a documented extension: a LoRA-fine-tuned TerraMind (or Prithvi-EO-2.0) via TerraTorch for Track 2, run from the Docker CUDA container; it slots into the same scored comparison.
+Both tracks are measured end-to-end on real data and complete: Track 1 (EuroSAT MS) compares RF, ResNet-18 and the DINOv3-sat probe; Track 2 compares a per-pixel RF, a U-Net, and a LoRA-fine-tuned Prithvi-EO-2.0 on a real Sentinel-2 composite + ESA WorldCover over Thessaloniki. `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool.
 
 ## Repository layout
 
 ```
 src/landcover/    classes (5-class + WorldCover/EuroSAT remaps) · indices · datasets ·
                   rf (patch + pixel Random Forests) · metrics · splits · cli
-scripts/          fetch_data.py · make_sample_data.py · train_eurosat.py · train_segmentation.py · make_figures.py
+scripts/          fetch_data.py · make_sample_data.py · train_eurosat.py · train_segmentation.py · train_gfm.py · make_figures.py
 notebooks/        Colab/Kaggle copies of the training scripts
 data/sample/      small synthetic fixtures — everything runs offline from these
 results/          generated metrics (the only source of README numbers)
