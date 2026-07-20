@@ -24,9 +24,9 @@ def cell(value: object) -> str:
 
 def track1() -> list[str]:
     path = RESULTS / "eurosat.json"
-    lines = ["### Track 1 — EuroSAT patch classification", ""]
+    lines = ["### Track 1: EuroSAT patch classification", ""]
     if not path.exists():
-        lines.append("_No run recorded yet — see `scripts/train_eurosat.py`._")
+        lines.append("_No run recorded yet. See `scripts/train_eurosat.py`._")
         return lines
     data = json.loads(path.read_text(encoding="utf-8"))
     lines.append(f"**Dataset:** {data.get('dataset', 'EuroSAT')} · five target classes")
@@ -43,9 +43,9 @@ def track1() -> list[str]:
 
 def track2() -> list[str]:
     path = RESULTS / "segmentation.json"
-    lines = ["### Track 2 — Sentinel-2 segmentation", ""]
+    lines = ["### Track 2: Sentinel-2 segmentation", ""]
     if not path.exists():
-        lines.append("_No run recorded yet — see `scripts/train_segmentation.py`._")
+        lines.append("_No run recorded yet. See `scripts/train_segmentation.py`._")
         return lines
     data = json.loads(path.read_text(encoding="utf-8"))
     models = data["models"]
