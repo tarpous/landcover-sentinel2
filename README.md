@@ -11,6 +11,8 @@ The classical core — spectral indices, a five-class scheme with a unit-tested 
 - **Track 1 — EuroSAT patch classification:** Random Forest on spectral indices vs a fine-tuned ResNet-18 vs a DINOv3 satellite linear probe, reported against published EuroSAT numbers.
 - **Track 2 — Sentinel-2 segmentation:** per-pixel Random Forest vs a U-Net vs a LoRA-fine-tuned geospatial foundation model (TerraMind via TerraTorch), on ESA-WorldCover-supervised chips over a Thessaloniki AOI, with per-class F1/IoU and a **label-efficiency curve** (performance at 10 / 25 / 100 % of training labels — the argument foundation-model papers make).
 
+![Sentinel-2, Random Forest prediction, and WorldCover truth over Thessaloniki](docs/img/segmentation_map.png)
+
 ## Results
 
 <!-- results:begin -->
@@ -90,6 +92,10 @@ Three choices carry the study:
 - **Spatially blocked splits.** Adjacent Sentinel-2 chips are spatially autocorrelated; a random split leaks neighbours across folds and inflates accuracy. Chips are assigned to a coarse spatial grid and whole blocks go to one fold, with a leakage guard that raises on any shared block.
 - **One metric implementation.** Overall accuracy, macro-F1, per-class F1/IoU and mIoU are computed by a single tested module and cross-checked against hand-computed confusion matrices, so the Random Forest, the U-Net and the foundation model are scored identically.
 
+The row-normalized confusion matrix shows where the errors actually land (`scripts/make_figures.py`):
+
+![Random Forest confusion matrix](docs/img/confusion_matrix.png)
+
 ## Status
 
 Both tracks are measured end-to-end on real data (EuroSAT MS for Track 1; a real Sentinel-2 median composite + ESA WorldCover over Thessaloniki for Track 2). `landcover predict` produces a classified GeoTIFF with a preserved CRS/transform and per-class area statistics — the artifact a downstream geospatial agent wraps as a tool. Two drop-in extensions are left optional because they need gated/large downloads: a DINOv3 satellite linear probe (Track 1, Meta gated weights) and a LoRA-fine-tuned TerraMind via TerraTorch (Track 2, run from the Docker CUDA container) — both slot into the same scored comparison.
@@ -99,7 +105,7 @@ Both tracks are measured end-to-end on real data (EuroSAT MS for Track 1; a real
 ```
 src/landcover/    classes (5-class + WorldCover/EuroSAT remaps) · indices · datasets ·
                   rf (patch + pixel Random Forests) · metrics · splits · cli
-scripts/          fetch_data.py · make_sample_data.py · train_eurosat.py · train_segmentation.py
+scripts/          fetch_data.py · make_sample_data.py · train_eurosat.py · train_segmentation.py · make_figures.py
 notebooks/        Colab/Kaggle copies of the training scripts
 data/sample/      small synthetic fixtures — everything runs offline from these
 results/          generated metrics (the only source of README numbers)
